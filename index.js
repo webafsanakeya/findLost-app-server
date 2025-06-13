@@ -1,19 +1,13 @@
-
-const express = require('express')
-const cors = require('cors')
-require('dotenv').config()
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 3000;
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 // middleware
 app.use(cors());
 app.use(express.json());
-
-
-
-
-
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.3g5ecwq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -23,7 +17,7 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
@@ -31,19 +25,72 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-
-const itemsCollection = client.db('findLost').collection('items');
+    const itemsCollection = client.db("findLost").collection("items");
+    const recoveriesCollection = client.db("findLost").collection("recoveries");
 
     // items api
-    app.get('/items', async(req, res)=>{
+    app.get("/items", async (req, res) => {
       const cursor = itemsCollection.find();
       const result = await cursor.toArray();
       res.send(result);
-    })
+    });
+
+    app.get("/items/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await itemsCollection.findOne(query);
+      res.send(result);
+    });
+
+    // item recoveries related api
+
+    app.get("/recoveries", async (req, res) => {
+      const email = req.query.email;
+      if (!email) {
+        return res.status(400).send({ error: "Email is required" });
+      }
+      const query = {
+        "recoveredBy.email": email,
+      };
+      const result = await recoveriesCollection.find(query).toArray();
+
+      // bad way to aggregate data
+     for (const recovery of result) {
+      const itemId = recovery.itemId;
+      const item = await itemsCollection.findOne(
+        { _id: new ObjectId(itemId) },
+        {
+          projection: {
+            name: 1,          
+            category: 1,
+            image: 1,
+            status: 1
+          }
+        }
+      );
+
+      if (item) {
+        recovery.itemName = item.name;
+        recovery.itemCategory = item.category;
+        recovery.itemImage = item.image;
+        recovery.itemStatus = item.status;
+      }
+    }
+      res.send(result);
+    });
+
+    app.post("/recoveries", async (req, res) => {
+      const recoveryData = req.body;
+      console.log(recoveryData);
+      const result = await recoveriesCollection.insertOne(recoveryData);
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -51,12 +98,10 @@ const itemsCollection = client.db('findLost').collection('items');
 }
 run().catch(console.dir);
 
+app.get("/", (req, res) => {
+  res.send("Lost and Find App is Cooking");
+});
 
-
-app.get('/', (req, res) =>{
-    res.send('Lost and Find App is Cooking')
-})
-
-app.listen(port, () =>{
-    console.log(`Find and Lost server is running on port ${port}`);
-})
+app.listen(port, () => {
+  console.log(`Find and Lost server is running on port ${port}`);
+});
