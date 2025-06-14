@@ -40,6 +40,18 @@ async function run() {
       res.send(result);
     });
 
+     app.get('/items/recoveries', async(req, res) =>{
+      const email = req.query.email;
+      const query = {email: email};
+      const items = await itemsCollection.find(query).toArray();
+      for(const item of items){
+        const recoveryQuery ={itemId: item._id.toString()}
+        const recovery_count = await recoveriesCollection.countDocuments(recoveryQuery)
+        item.recovery_count = recovery_count;
+      }
+      res.send(items);
+    })
+
     app.get("/items/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -53,6 +65,8 @@ async function run() {
       const result = await itemsCollection.insertOne(data);
       res.send(result);
     });
+
+   
 
     // item recoveries related api
 
