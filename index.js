@@ -30,7 +30,12 @@ async function run() {
 
     // items api
     app.get("/items", async (req, res) => {
-      const cursor = itemsCollection.find();
+      const email = req.query.email;
+      const query = {};
+      if (email) {
+        query.email = email;
+      }
+      const cursor = itemsCollection.find(query);
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -39,6 +44,13 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await itemsCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.post("/items", async (req, res) => {
+      const data = req.body;
+      console.log(data);
+      const result = await itemsCollection.insertOne(data);
       res.send(result);
     });
 
@@ -55,36 +67,58 @@ async function run() {
       const result = await recoveriesCollection.find(query).toArray();
 
       // bad way to aggregate data
-     for (const recovery of result) {
-      const itemId = recovery.itemId;
-      const item = await itemsCollection.findOne(
-        { _id: new ObjectId(itemId) },
-        {
-          projection: {
-            name: 1,          
-            category: 1,
-            image: 1,
-            status: 1
+      for (const recovery of result) {
+        const itemId = recovery.itemId;
+        const item = await itemsCollection.findOne(
+          { _id: new ObjectId(itemId) },
+          {
+            projection: {
+              name: 1,
+              category: 1,
+              image: 1,
+              status: 1,
+            },
           }
-        }
-      );
+        );
 
-      if (item) {
-        recovery.itemName = item.name;
-        recovery.itemCategory = item.category;
-        recovery.itemImage = item.image;
-        recovery.itemStatus = item.status;
+        if (item) {
+          recovery.itemName = item.name;
+          recovery.itemCategory = item.category;
+          recovery.itemImage = item.image;
+          recovery.itemStatus = item.status;
+        }
       }
-    }
+      res.send(result);
+    });
+
+    app.get("/recoveries/item/:item_id", async (req, res) => {
+      const item_id = req.params.item_id;
+      const query = { itemId: item_id };
+      const result = await recoveriesCollection.find(query).toArray();
       res.send(result);
     });
 
     app.post("/recoveries", async (req, res) => {
       const recoveryData = req.body;
-      console.log(recoveryData);
+      
+  if (!recoveryData.itemId) {
+    return res.status(400).send({ message: "Missing itemId" });
+  }
       const result = await recoveriesCollection.insertOne(recoveryData);
       res.send(result);
     });
+
+    app.patch('/recoveries/:id', async(req, res) =>{
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const updatedDoc = {
+        $set: {
+          status: req.body.status
+        }
+      }
+      const result = await recoveriesCollection.updateOne(filter, updatedDoc)
+      res.send(result);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
