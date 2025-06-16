@@ -9,7 +9,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 // middleware
 app.use(cors({
-  origin: ['http://localhost:5173'],
+  origin: ['http://localhost:5173', 'https://find-lost-app-38c76.web.app'],
   credentials: true
 }));
 app.use(express.json());
@@ -67,7 +67,8 @@ async function run() {
         // set token in the cookies
         res.cookie('token', token, {
           httpOnly: true,
-          secure: false
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: "none"
         })
       res.send({success: true})
     })
@@ -183,10 +184,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
