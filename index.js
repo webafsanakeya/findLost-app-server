@@ -171,13 +171,31 @@ async function run() {
   }
 });
 
-    app.patch("/recoveries/:id", async (req, res) => {
-      const filter = { _id: new ObjectId(req.params.id) };
-      const updateDoc = { $set: { status: req.body.status } };
-      const result = await recoveriesCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
+    app.patch("/recoveries/:id", verifyToken, async (req, res) => {
+  try {
+    const recoveryId = req.params.id;
+    const { status } = req.body;
 
+    if (!status) return res.status(400).json({ message: "Missing status" });
+
+    // Check ownership
+    const recovery = await recoveriesCollection.findOne({ _id: new ObjectId(recoveryId) });
+    if (!recovery) return res.status(404).json({ message: "Recovery not found" });
+    if (recovery.recoveredBy.email !== req.decoded.email) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const result = await recoveriesCollection.updateOne(
+      { _id: new ObjectId(recoveryId) },
+      { $set: { status } }
+    );
+
+    res.json({ message: "Recovery updated", modifiedCount: result.modifiedCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to update recovery" });
+  }
+});
     app.get("/", (req, res) => {
       res.send("Lost and Find App is Cooking");
     });
