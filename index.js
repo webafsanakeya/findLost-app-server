@@ -90,12 +90,21 @@ async function run() {
 
     // Recoveries
     app.get("/recoveries", logger, verifyToken, async (req, res) => {
-      const email = req.query.email;
-      if (email !== req.decoded.email) return res.status(403).send({ message: 'forbidden access' });
+  try {
+    const email = req.query.email;
 
-      const result = await recoveriesCollection.find({ "recoveredBy.email": email }).toArray();
+    // Security check
+    if (!email || email !== req.decoded.email) {
+      return res.status(403).json({ message: "Forbidden access" });
+    }
 
-      for (const recovery of result) {
+    const userRecoveries = await recoveriesCollection
+      .find({ "recoveredBy.email": email })
+      .toArray();
+
+    // Fetch item details in parallel
+    const enhanced = await Promise.all(
+      userRecoveries.map(async (recovery) => {
         const item = await itemsCollection.findOne(
           { _id: new ObjectId(recovery.itemId) },
           { projection: { name: 1, category: 1, image: 1, status: 1 } }
@@ -106,10 +115,16 @@ async function run() {
           recovery.itemImage = item.image;
           recovery.itemStatus = item.status;
         }
-      }
+        return recovery;
+      })
+    );
 
-      res.send(result);
-    });
+    res.json(enhanced);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch recoveries" });
+  }
+});
 
     app.get("/recoveries/item/:item_id", async (req, res) => {
       const result = await recoveriesCollection.find({ itemId: req.params.item_id }).toArray();
