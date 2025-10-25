@@ -126,16 +126,50 @@ async function run() {
   }
 });
 
-    app.get("/recoveries/item/:item_id", async (req, res) => {
-      const result = await recoveriesCollection.find({ itemId: req.params.item_id }).toArray();
-      res.send(result);
-    });
+   app.get("/recoveries/item/:item_id", verifyToken, async (req, res) => {
+  try {
+    const itemId = req.params.item_id;
+    if (!itemId) return res.status(400).json({ message: "Missing itemId" });
 
-    app.post("/recoveries", async (req, res) => {
-      if (!req.body.itemId) return res.status(400).send({ message: "Missing itemId" });
-      const result = await recoveriesCollection.insertOne(req.body);
-      res.send(result);
-    });
+    const itemRecoveries = await recoveriesCollection
+      .find({ itemId })
+      .toArray();
+
+    res.json(itemRecoveries);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch item recoveries" });
+  }
+});
+
+   app.post("/recoveries", verifyToken, async (req, res) => {
+  try {
+    const { itemId, recoveredDate, status } = req.body;
+
+    if (!itemId || !recoveredDate || !status) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    const newRecovery = {
+      itemId,
+      recoveredDate,
+      status,
+      recoveredBy: {
+        name: req.decoded.name,
+        email: req.decoded.email,
+        photoURL: req.decoded.photoURL || "",
+      },
+    };
+
+    const result = await recoveriesCollection.insertOne(newRecovery);
+    const inserted = await recoveriesCollection.findOne({ _id: result.insertedId });
+
+    res.status(201).json(inserted);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to add recovery" });
+  }
+});
 
     app.patch("/recoveries/:id", async (req, res) => {
       const filter = { _id: new ObjectId(req.params.id) };
