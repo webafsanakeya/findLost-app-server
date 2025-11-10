@@ -91,7 +91,7 @@ async function run() {
     });
 
     // Recoveries
-    app.get("/recoveries", logger, verifyToken, async (req, res) => {
+app.get("/recoveries", logger, verifyToken, async (req, res) => {
   try {
     const email = req.query.email;
 
@@ -104,26 +104,36 @@ async function run() {
       .find({ "recoveredBy.email": email })
       .toArray();
 
-    // Fetch item details in parallel
+    // Fetch item details safely
     const enhanced = await Promise.all(
       userRecoveries.map(async (recovery) => {
+        const { itemId } = recovery;
+
+        // ✅ Validate before converting
+        if (!itemId || !ObjectId.isValid(itemId)) {
+          console.warn("Invalid itemId in recovery:", itemId);
+          return recovery; // Skip lookup, return as is
+        }
+
         const item = await itemsCollection.findOne(
-          { _id: new ObjectId(recovery.itemId) },
+          { _id: new ObjectId(itemId) },
           { projection: { name: 1, category: 1, image: 1, status: 1 } }
         );
+
         if (item) {
           recovery.itemName = item.name;
           recovery.itemCategory = item.category;
           recovery.itemImage = item.image;
           recovery.itemStatus = item.status;
         }
+
         return recovery;
       })
     );
 
     res.json(enhanced);
   } catch (err) {
-    console.error(err);
+    console.error("Error fetching recoveries:", err);
     res.status(500).json({ message: "Failed to fetch recoveries" });
   }
 });
