@@ -18,8 +18,7 @@ const client = new MongoClient(uri, {
 app.use(cors({
   origin: ['http://localhost:5173', 
     'https://find-lost-app-38c76.web.app', 
-    'https://findlost-app.netlify.app', 
-    'https://find-lost-app-38c76.firebaseapp.com'],
+    'https://findlost-app.netlify.app', 'https://find-lost-app-38c76.firebaseapp.com'],
   credentials: true
 }));
 app.use(express.json());
